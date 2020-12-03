@@ -6,9 +6,11 @@ mod constants;
 mod models;
 mod utils;
 
-use crate::constants::{INSTRUCTION_TABLES, WORD};
-use crate::models::{Argument, ArgumentType, Datum, Label, Section, Text};
-use crate::utils::read_lines;
+use crate::constants::{INSTRUCTION_TABLE, WORD};
+use crate::models::{
+    ArgumentType, Datum, Instruction, InstructionFormat, Label, Section, Text,
+};
+use crate::utils::{convert_string_to_int, read_lines};
 
 fn main() {
     let mut data: Vec<Datum> = vec![];
@@ -19,8 +21,7 @@ fn main() {
     let input_filepath = &args[1];
     let mut input_file = File::open(input_filepath).expect("Failed to read input file.");
 
-    let (data_section_size, text_section_size) =
-        set_initial_values(&mut data, &mut labels, &mut input_file);
+    set_initial_values(&mut data, &mut labels, &mut input_file);
     disassemble_instructions(&mut data, &mut labels, &mut texts, &mut input_file);
 
     println!("DATA: {:?}", data);
@@ -32,7 +33,7 @@ fn set_initial_values(
     mut data: &mut Vec<Datum>,
     mut labels: &mut Vec<Label>,
     mut input_file: &mut File,
-) -> (i32, i32) {
+) {
     let mut current_address = 0x10000000 - WORD;
     let mut current_section = Section::NONE;
 
@@ -57,12 +58,10 @@ fn set_initial_values(
             Section::NONE => (),
         }
     }
-
-    (data_section_size * WORD, text_section_size * WORD)
 }
 
 fn disassemble_instructions(
-    mut data: &mut Vec<Datum>,
+    data: &mut Vec<Datum>,
     mut labels: &mut Vec<Label>,
     mut texts: &mut Vec<Text>,
     mut input_file: &mut File,
@@ -100,74 +99,107 @@ fn append_instructions_to_text(
     current_address: i32,
     data: &Vec<Datum>,
     labels: &Vec<Label>,
-    mut texts: &mut Vec<Text>,
+    texts: &mut Vec<Text>,
 ) {
     if let [name, arguments] = text.trim_start().split('\t').collect::<Vec<&str>>()[..] {
-        let instruction_table = INSTRUCTION_TABLES
+        let instruction = INSTRUCTION_TABLE
             .iter()
             .find(|table| table.compare_name(name))
             .unwrap();
-
-        let mut new_text = instruction_table.to_text(0, current_address, vec![], false);
 
         let argument_texts = arguments
             .split(",")
             .map(|arg| arg.trim())
             .collect::<Vec<&str>>();
 
-        let mut stack_arguments: Vec<i32> = vec![];
-        let mut argument_values = argument_texts
-            .iter()
-            .filter_map(|argument_text| {
-                let argument_type = resolve_argument_type(argument_text);
+        let arguments = resolve_arguments(&argument_texts, &data, &labels);
 
-                match argument_type {
-                    ArgumentType::NUMBER => Some(convert_string_to_int(argument_text)),
-                    ArgumentType::REGISTER => Some(convert_string_to_int(
-                        &argument_text[1..argument_text.len()],
-                    )),
-                    ArgumentType::LABEL => {
-                        if let Some(datum) =
-                            data.iter().find(|datum| datum.compare_name(argument_text))
-                        {
-                            new_text.set_is_label(false);
-                            Some(datum.get_address())
-                        } else {
-                            if let Some(label) = labels
-                                .iter()
-                                .find(|label| label.compare_name(argument_text))
-                            {
-                                new_text.set_is_label(true);
-                                Some(label.get_address())
-                            } else {
-                                panic!("Failed to resolve argument value");
-                            }
-                        }
-                    }
-                    ArgumentType::STACK => {
-                        if let [offset, base] = argument_text.split('(').collect::<Vec<&str>>()[..]
-                        {
-                            let offset = convert_string_to_int(offset);
-                            let base = convert_string_to_int(&base[1..(base.len() - 1)]);
+        for text in get_text_by_format(&instruction, &arguments, current_address) {
+            texts.push(text);
+        }
+    }
+}
 
-                            stack_arguments = vec![offset, base];
-                            None
-                        } else {
-                            panic!("Failed to resolve argument value");
-                        }
+fn get_text_by_format(
+    instruction: &Instruction,
+    arguments: &Vec<i32>,
+    current_address: i32,
+) -> Vec<Text> {
+    let Instruction { funct, opcode, .. } = instruction;
+    match convert_opcode_to_format(instruction.opcode) {
+        InstructionFormat::REGISTER => vec![Text::new(
+            arguments[1],
+            arguments[2],
+            arguments[0],
+            0,
+            *funct,
+            *opcode,
+            0,
+            0,
+        )],
+        InstructionFormat::JUMP => vec![Text::new(
+            0,
+            0,
+            0,
+            0,
+            *funct,
+            *opcode,
+            0,
+            get_address_difference(current_address, arguments[0]),
+        )],
+        InstructionFormat::IMMEDIATE => vec![Text::new(
+            arguments[0],
+            arguments[1],
+            0,
+            0,
+            *funct,
+            *opcode,
+            arguments[2],
+            0,
+        )],
+        InstructionFormat::PSEUDO => panic!("A pseudo instruction found.")
+    }
+}
+
+fn resolve_arguments(
+    argument_texts: &Vec<&str>,
+    data: &Vec<Datum>,
+    labels: &Vec<Label>,
+) -> Vec<i32> {
+    let mut arguments: Vec<i32> = vec![];
+
+    for argument_text in argument_texts {
+        match resolve_argument_type(argument_text) {
+            ArgumentType::NUMBER => arguments.push(convert_string_to_int(argument_text)),
+            ArgumentType::REGISTER => arguments.push(convert_string_to_int(
+                &argument_text[1..argument_text.len()],
+            )),
+            ArgumentType::LABEL => {
+                if let Some(datum) = find_datum(argument_text, &data) {
+                    arguments.push(datum.get_address());
+                } else {
+                    if let Some(label) = find_label(argument_text, &labels) {
+                        arguments.push(label.get_address());
+                    } else {
+                        panic!("Failed to resolve argument value");
                     }
                 }
-            })
-            .collect::<Vec<i32>>();
+            }
+            ArgumentType::STACK => {
+                if let [offset, base] = argument_text.split('(').collect::<Vec<&str>>()[..] {
+                    let offset = convert_string_to_int(offset);
+                    let base = convert_string_to_int(&base[1..(base.len() - 1)]);
 
-        if stack_arguments.len() > 0 {
-            argument_values.append(&mut stack_arguments);
+                    arguments.push(offset);
+                    arguments.push(base);
+                } else {
+                    panic!("Failed to resolve argument value");
+                }
+            }
         }
-
-        new_text.set_arguments(argument_values);
-
-        texts.push(new_text);
     }
+
+    arguments
 }
 
 fn resolve_argument_type(text: &str) -> ArgumentType {
@@ -220,10 +252,23 @@ fn resolve_labels(text: &str, current_address: i32, labels: &mut Vec<Label>) -> 
     }
 }
 
-fn convert_string_to_int(text: &str) -> i32 {
-    if text.chars().nth(0).unwrap() == '-' {
-        i32::from_str_radix(text[1..text.len()].trim_start_matches("0x"), 16).unwrap() * -1
-    } else {
-        i32::from_str_radix(text.trim_start_matches("0x"), 16).unwrap()
+fn get_address_difference(current_address: i32, target_address: i32) -> i32 {
+    (target_address - current_address) / WORD + 1
+}
+
+fn convert_opcode_to_format(opcode: i32) -> InstructionFormat {
+    match opcode {
+        0 => InstructionFormat::REGISTER,
+        2 | 3 => InstructionFormat::JUMP,
+        -1 => InstructionFormat::PSEUDO,
+        _ => InstructionFormat::IMMEDIATE,
     }
+}
+
+fn find_datum<'a>(name: &'a str, data: &'a Vec<Datum>) -> Option<&'a Datum> {
+    data.iter().find(|datum| datum.compare_name(name))
+}
+
+fn find_label<'a>(name: &'a str, labels: &'a Vec<Label>) -> Option<&'a Label> {
+    labels.iter().find(|label| label.compare_name(name))
 }

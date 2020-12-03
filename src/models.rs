@@ -1,47 +1,20 @@
-use regex::Regex;
-
-pub struct InstructionTable {
+pub struct Instruction {
     name: &'static str,
-    pointer: i32,
-    sequence: [i32; 3],
-    opcode: i32,
-    funct: i32,
-    is_occupied: bool,
+    pub opcode: i32,
+    pub funct: i32,
 }
 
-impl InstructionTable {
-    pub const fn new(
-        name: &'static str,
-        pointer: i32,
-        sequence: [i32; 3],
-        opcode: i32,
-        funct: i32,
-        is_occupied: bool,
-    ) -> Self {
+impl Instruction {
+    pub const fn new(name: &'static str, opcode: i32, funct: i32) -> Self {
         Self {
             name,
-            pointer,
-            sequence,
             opcode,
             funct,
-            is_occupied,
         }
     }
 
     pub fn compare_name(&self, name: &str) -> bool {
         self.name == name
-    }
-
-    pub fn to_text(&self, next: i32, address: i32, arguments: Vec<i32>, is_label: bool) -> Text {
-        Text {
-            next,
-            instruction: self.name.to_string(),
-            opcode: self.opcode,
-            funct: self.funct,
-            address,
-            arguments,
-            is_label,
-        }
     }
 }
 
@@ -72,34 +45,37 @@ impl Datum {
 
 #[derive(Debug)]
 pub struct Text {
-    next: i32,
-    instruction: String,
-    opcode: i32,
+    rs: i32,
+    rt: i32,
+    rd: i32,
+    shamt: i32,
     funct: i32,
+    opcode: i32,
+    immediate: i32,
     address: i32,
-    arguments: Vec<i32>,
-    is_label: bool,
 }
 
 impl Text {
-    pub fn new(instruction: &str, opcode: i32, funct: i32, address: i32) -> Self {
+    pub fn new(
+        rs: i32,
+        rt: i32,
+        rd: i32,
+        shamt: i32,
+        funct: i32,
+        opcode: i32,
+        immediate: i32,
+        address: i32,
+    ) -> Self {
         Self {
-            next: 0,
-            instruction: instruction.to_string(),
-            opcode,
+            rs,
+            rt,
+            rd,
+            shamt,
             funct,
+            opcode,
+            immediate,
             address,
-            arguments: vec![],
-            is_label: false,
         }
-    }
-
-    pub fn set_is_label(&mut self, is_label: bool) {
-        self.is_label = is_label;
-    }
-
-    pub fn set_arguments(&mut self, arguments: Vec<i32>) {
-        self.arguments = arguments;
     }
 }
 
@@ -135,18 +111,6 @@ pub enum Section {
     TEXT,
 }
 
-#[derive(Clone)]
-pub struct Argument {
-    pub regex: Regex,
-    pub data_type: ArgumentType,
-}
-
-impl Argument {
-    pub fn new(regex: Regex, data_type: ArgumentType) -> Self {
-        Argument { regex, data_type }
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum ArgumentType {
     NUMBER,
@@ -155,9 +119,9 @@ pub enum ArgumentType {
     STACK,
 }
 
-#[derive(Debug)]
 pub enum InstructionFormat {
-    R,
-    I,
-    J,
+    REGISTER,
+    IMMEDIATE,
+    JUMP,
+    PSEUDO,
 }
