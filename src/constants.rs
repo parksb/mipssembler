@@ -1,4 +1,4 @@
-use crate::models::Instruction;
+use crate::instruction::Instruction;
 
 pub const INSTRUCTION_NUM: usize = 21;
 
