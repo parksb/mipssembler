@@ -1,3 +1,4 @@
+use crate::constants::WORD;
 use regex::Regex;
 
 #[derive(Debug)]
@@ -18,21 +19,9 @@ impl Label {
         self.name == name.to_string()
     }
 
-    pub fn get_name(self) -> String {
-        self.name
-    }
-
     pub fn get_address(&self) -> i32 {
         self.address
     }
-
-    pub fn set_address(&mut self, address: i32) {
-        self.address = address;
-    }
-}
-
-pub fn find_mut_label<'a>(name: &'a str, labels: &'a mut Vec<Label>) -> Option<&'a mut Label> {
-    labels.iter_mut().find(|label| label.compare_name(name))
 }
 
 pub fn find_label<'a>(name: &'a str, labels: &'a Vec<Label>) -> Option<&'a Label> {
@@ -52,4 +41,23 @@ pub fn resolve_labels(code: &str) -> Option<Label> {
     } else {
         None
     }
+}
+
+pub fn get_addressed_labels(codes: &Vec<String>, labels: &Vec<Label>) -> Vec<Label> {
+    let mut current_address = 0x400000;
+    codes
+        .iter()
+        .filter_map(|code| {
+            if let Some(label) = resolve_labels(&code) {
+                if let Some(label) = find_label(&label.name, &labels) {
+                    Some(Label::new(&label.name, current_address))
+                } else {
+                    panic!("Use of undeclared label.");
+                }
+            } else {
+                current_address += WORD;
+                None
+            }
+        })
+        .collect()
 }

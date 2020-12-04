@@ -1,4 +1,4 @@
-use crate::utils::convert_string_to_int;
+use crate::utils::{convert_int_to_binary, convert_string_to_int};
 
 #[derive(Debug)]
 pub struct Datum {
@@ -22,6 +22,10 @@ impl Datum {
 
     pub fn get_address(&self) -> i32 {
         self.address
+    }
+
+    pub fn to_binary(&self) -> String {
+        convert_int_to_binary(self.value, 32)
     }
 }
 
