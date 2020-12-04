@@ -11,7 +11,7 @@ mod utils;
 
 use crate::constants::WORD;
 use crate::datum::{resolve_data, Datum};
-use crate::label::{is_label, resolve_labels, Label};
+use crate::label::{is_label, resolve_labels, Label, find_mut_label};
 use crate::pseudo_instruction::disassemble_pseudo_instruction;
 use crate::text::{get_text_from_code, Text};
 use crate::utils::read_lines;
@@ -28,9 +28,9 @@ fn main() {
     let input_filepath = &args[1];
     let mut input_file = File::open(input_filepath).expect("Failed to read input file.");
 
-    let (data, labels) = extract_data_and_labels(&mut input_file);
+    let (data, mut labels) = extract_data_and_labels(&mut input_file);
     let codes = extract_codes(&data, &mut input_file);
-    let texts = disassemble_instructions(&data, &labels, &codes);
+    let texts = disassemble_instructions(&data, &mut labels, &codes);
 
     println!("CODE: {:?}", codes);
     println!("DATA: {:?}", data);
@@ -80,10 +80,9 @@ fn extract_codes(data: &Vec<Datum>, mut input_file: &mut File) -> Vec<String> {
                 text_section_size += 1;
                 if text_section_size > 1 && !line.is_empty() {
                     if !is_label(&line) {
-                        if let Some(pseudo_instructions) =
-                            disassemble_pseudo_instruction(&line, &data)
-                        {
-                            codes.extend(pseudo_instructions);
+                        let pseudo_instruction_codes = disassemble_pseudo_instruction(&line, &data);
+                        if let Some(pseudo_instruction_codes) = pseudo_instruction_codes {
+                            codes.extend(pseudo_instruction_codes);
                         } else {
                             codes.push(line.trim_start().to_string());
                         }
@@ -101,19 +100,25 @@ fn extract_codes(data: &Vec<Datum>, mut input_file: &mut File) -> Vec<String> {
 
 fn disassemble_instructions(
     data: &Vec<Datum>,
-    labels: &Vec<Label>,
+    mut labels: &mut Vec<Label>,
     codes: &Vec<String>,
 ) -> Vec<Text> {
-    let mut current_address = 0x10000000 - WORD;
+    let mut current_address = 0x400000;
+
     codes
         .iter()
         .filter_map(|code| {
-            if let None = resolve_labels(&code) {
+            if let Some(label) = resolve_labels(&code) {
+                if let Some(label) = find_mut_label(&label.get_name(), &mut labels) {
+                    label.set_address(current_address);
+                } else {
+                    panic!("Use of undeclared label.");
+                }
+                None
+            } else {
                 let text = get_text_from_code(&code, current_address, &data, &labels);
                 current_address += WORD;
                 Some(text)
-            } else {
-                None
             }
         })
         .collect()
