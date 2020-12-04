@@ -3,11 +3,12 @@ use std::io::{BufRead, BufReader, Lines, Seek, SeekFrom};
 use std::iter::Map;
 
 use crate::constants::WORD;
+use std::ops::Neg;
 
-pub fn read_lines(
-    file: &mut File,
-) -> Map<Lines<BufReader<&mut File>>, fn(std::io::Result<String>) -> String> {
-    if let Ok(_) = file.seek(SeekFrom::Start(0)) {
+type LinesMap<'a> = Map<Lines<BufReader<&'a mut File>>, fn(std::io::Result<String>) -> String>;
+
+pub fn read_lines(file: &mut File) -> LinesMap {
+    if file.seek(SeekFrom::Start(0)).is_ok() {
         BufReader::new(file).lines().map(|line| line.unwrap())
     } else {
         panic!("Failed to set position to zero.");
@@ -15,14 +16,12 @@ pub fn read_lines(
 }
 
 pub fn convert_string_to_int(code: &str) -> i32 {
-    if code.chars().nth(0).unwrap() == '-' {
-        i32::from_str_radix(&code[1..code.len()], 16).unwrap() * -1
+    if code.starts_with('-') {
+        i32::from_str_radix(&code[1..code.len()], 16).unwrap().neg()
+    } else if code.starts_with("0x") {
+        i32::from_str_radix(code.trim_start_matches("0x"), 16).unwrap()
     } else {
-        if code.starts_with("0x") {
-            i32::from_str_radix(code.trim_start_matches("0x"), 16).unwrap()
-        } else {
-            i32::from_str_radix(code, 10).unwrap()
-        }
+        i32::from_str_radix(code, 10).unwrap()
     }
 }
 

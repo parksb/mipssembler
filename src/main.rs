@@ -9,7 +9,7 @@ mod pseudo_instruction;
 mod text;
 mod utils;
 
-use crate::constants::WORD;
+use crate::constants::{DATA_SECTION_MIN_ADDRESS, TEXT_SECTION_MIN_ADDRESS, WORD};
 use crate::datum::{resolve_data, Datum};
 use crate::label::{get_addressed_labels, is_label, resolve_labels, Label};
 use crate::pseudo_instruction::disassemble_pseudo_instruction;
@@ -17,7 +17,6 @@ use crate::text::{get_text_from_code, Text};
 use crate::utils::{convert_int_to_binary, read_lines};
 use std::io::Write;
 
-#[derive(Debug)]
 pub enum Section {
     NONE,
     DATA,
@@ -41,7 +40,7 @@ fn main() {
 }
 
 fn extract_data_and_labels(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>) {
-    let mut current_address = 0x10000000 - WORD;
+    let mut current_address = DATA_SECTION_MIN_ADDRESS - WORD;
     let mut current_section = Section::NONE;
 
     let mut data: Vec<Datum> = vec![];
@@ -69,7 +68,7 @@ fn extract_data_and_labels(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>
     (data, labels)
 }
 
-fn extract_codes(data: &Vec<Datum>, mut input_file: &mut File) -> Vec<String> {
+fn extract_codes(data: &[Datum], mut input_file: &mut File) -> Vec<String> {
     let mut codes = vec![];
     let mut current_section = Section::NONE;
     let mut text_section_size = 0;
@@ -77,39 +76,32 @@ fn extract_codes(data: &Vec<Datum>, mut input_file: &mut File) -> Vec<String> {
     for line in read_lines(&mut input_file) {
         current_section = resolve_section(&line).unwrap_or(current_section);
 
-        match current_section {
-            Section::TEXT => {
-                text_section_size += 1;
-                if text_section_size > 1 && !line.is_empty() {
-                    if !is_label(&line) {
-                        let pseudo_instruction_codes = disassemble_pseudo_instruction(&line, &data);
-                        if let Some(pseudo_instruction_codes) = pseudo_instruction_codes {
-                            codes.extend(pseudo_instruction_codes);
-                        } else {
-                            codes.push(line.trim_start().to_string());
-                        }
+        if let Section::TEXT = current_section {
+            text_section_size += 1;
+            if text_section_size > 1 && !line.is_empty() {
+                if !is_label(&line) {
+                    let pseudo_instruction_codes = disassemble_pseudo_instruction(&line, &data);
+                    if let Some(pseudo_instruction_codes) = pseudo_instruction_codes {
+                        codes.extend(pseudo_instruction_codes);
                     } else {
-                        codes.push(line);
+                        codes.push(line.trim_start().to_string());
                     }
+                } else {
+                    codes.push(line);
                 }
             }
-            _ => (),
         }
     }
 
     codes
 }
 
-fn disassemble_instructions(
-    data: &Vec<Datum>,
-    labels: &Vec<Label>,
-    codes: &Vec<String>,
-) -> Vec<Text> {
-    let mut current_address = 0x400000;
+fn disassemble_instructions(data: &[Datum], labels: &[Label], codes: &[String]) -> Vec<Text> {
+    let mut current_address = TEXT_SECTION_MIN_ADDRESS;
     codes
         .iter()
         .filter_map(|code| {
-            if let None = resolve_labels(&code) {
+            if resolve_labels(&code).is_none() {
                 let text = get_text_from_code(&code, current_address, &data, &labels);
                 current_address += WORD;
                 Some(text)
@@ -120,7 +112,7 @@ fn disassemble_instructions(
         .collect()
 }
 
-fn write_output(filepath: &str, data: &Vec<Datum>, texts: &Vec<Text>) {
+fn write_output(filepath: &str, data: &[Datum], texts: &[Text]) {
     let data_section_size = data.len() as i32 * WORD;
     let text_section_size = texts.len() as i32 * WORD;
 
@@ -131,7 +123,7 @@ fn write_output(filepath: &str, data: &Vec<Datum>, texts: &Vec<Text>) {
     result.extend(texts.iter().map(|text| text.to_binary()));
     result.extend(data.iter().map(|datum| datum.to_binary()));
 
-    let mut file = File::create(format!("{}", filepath)).expect("Failed to crate output file.");
+    let mut file = File::create(filepath).expect("Failed to crate output file.");
     write!(file, "{}", result.join("\n")).expect("Failed to write output file.");
 }
 

@@ -27,3 +27,6 @@ pub const INSTRUCTION_TABLE: [Instruction; INSTRUCTION_NUM] = [
 ];
 
 pub const WORD: i32 = 4;
+
+pub const DATA_SECTION_MIN_ADDRESS: i32 = 0x10000000;
+pub const TEXT_SECTION_MIN_ADDRESS: i32 = 0x400000;

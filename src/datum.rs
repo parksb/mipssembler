@@ -1,10 +1,9 @@
 use crate::utils::{convert_int_to_binary, convert_string_to_int};
 
-#[derive(Debug)]
 pub struct Datum {
     name: String,
     value: i32,
-    address: i32,
+    pub address: i32,
 }
 
 impl Datum {
@@ -16,21 +15,13 @@ impl Datum {
         }
     }
 
-    pub fn compare_name(&self, name: &str) -> bool {
-        self.name == name
-    }
-
-    pub fn get_address(&self) -> i32 {
-        self.address
-    }
-
     pub fn to_binary(&self) -> String {
         convert_int_to_binary(self.value, 32)
     }
 }
 
-pub fn find_datum<'a>(name: &'a str, data: &'a Vec<Datum>) -> Option<&'a Datum> {
-    data.iter().find(|datum| datum.compare_name(name))
+pub fn find_datum<'a>(name: &'a str, data: &'a [Datum]) -> Option<&'a Datum> {
+    data.iter().find(|datum| datum.name == name)
 }
 
 pub fn resolve_data(code: &str, current_address: i32) -> Option<Datum> {

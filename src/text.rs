@@ -5,7 +5,7 @@ use crate::label::{find_label, Label};
 use crate::utils::{convert_int_to_binary, convert_string_to_int, get_address_height};
 use regex::Regex;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 enum ArgumentType {
     NUMBER,
     REGISTER,
@@ -13,20 +13,19 @@ enum ArgumentType {
     STACK,
 }
 
-#[derive(Debug)]
 pub struct Text {
-    pub rs: i32,
-    pub rt: i32,
-    pub rd: i32,
-    pub shamt: i32,
-    pub funct: i32,
-    pub opcode: i32,
-    pub immediate: i32,
-    pub address: i32,
+    rs: i32,
+    rt: i32,
+    rd: i32,
+    shamt: i32,
+    funct: i32,
+    opcode: i32,
+    immediate: i32,
+    address: i32,
 }
 
 impl Text {
-    pub fn new(
+    fn new(
         rs: i32,
         rt: i32,
         rd: i32,
@@ -79,17 +78,17 @@ impl Text {
 pub fn get_text_from_code(
     text: &str,
     current_address: i32,
-    data: &Vec<Datum>,
-    labels: &Vec<Label>,
+    data: &[Datum],
+    labels: &[Label],
 ) -> Text {
     if let [name, arguments] = text.trim_start().split('\t').collect::<Vec<&str>>()[..] {
         let instruction = INSTRUCTION_TABLE
             .iter()
-            .find(|table| table.compare_name(name))
+            .find(|table| table.name == name)
             .unwrap();
 
         let argument_texts = arguments
-            .split(",")
+            .split(',')
             .map(|arg| arg.trim())
             .collect::<Vec<&str>>();
 
@@ -101,11 +100,7 @@ pub fn get_text_from_code(
     }
 }
 
-fn get_text_by_format(
-    instruction: &Instruction,
-    arguments: &Vec<i32>,
-    current_address: i32,
-) -> Text {
+fn get_text_by_format(instruction: &Instruction, arguments: &[i32], current_address: i32) -> Text {
     let Instruction { funct, opcode, .. } = instruction;
     match convert_opcode_to_format(instruction.opcode) {
         InstructionFormat::REGISTER => match instruction.funct {
@@ -163,14 +158,10 @@ fn get_text_by_format(
     }
 }
 
-fn resolve_arguments(
-    argument_texts: &Vec<&str>,
-    data: &Vec<Datum>,
-    labels: &Vec<Label>,
-) -> Vec<i32> {
+fn resolve_arguments(argument_codes: &[&str], data: &[Datum], labels: &[Label]) -> Vec<i32> {
     let mut arguments: Vec<i32> = vec![];
 
-    for argument_text in argument_texts {
+    for argument_text in argument_codes {
         match resolve_argument_type(argument_text) {
             ArgumentType::NUMBER => arguments.push(convert_string_to_int(argument_text)),
             ArgumentType::REGISTER => arguments.push(convert_string_to_int(
@@ -178,13 +169,11 @@ fn resolve_arguments(
             )),
             ArgumentType::LABEL => {
                 if let Some(datum) = find_datum(argument_text, &data) {
-                    arguments.push(datum.get_address());
+                    arguments.push(datum.address);
+                } else if let Some(label) = find_label(argument_text, &labels) {
+                    arguments.push(label.address);
                 } else {
-                    if let Some(label) = find_label(argument_text, &labels) {
-                        arguments.push(label.get_address());
-                    } else {
-                        panic!("Failed to resolve argument value.");
-                    }
+                    panic!("Failed to resolve argument value.");
                 }
             }
             ArgumentType::STACK => {

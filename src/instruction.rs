@@ -6,7 +6,7 @@ pub enum InstructionFormat {
 }
 
 pub struct Instruction {
-    name: &'static str,
+    pub name: &'static str,
     pub opcode: i32,
     pub funct: i32,
 }
@@ -18,10 +18,6 @@ impl Instruction {
             opcode,
             funct,
         }
-    }
-
-    pub fn compare_name(&self, name: &str) -> bool {
-        self.name == name
     }
 }
 

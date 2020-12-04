@@ -1,10 +1,9 @@
-use crate::constants::WORD;
+use crate::constants::{TEXT_SECTION_MIN_ADDRESS, WORD};
 use regex::Regex;
 
-#[derive(Debug)]
 pub struct Label {
     name: String,
-    address: i32,
+    pub address: i32,
 }
 
 impl Label {
@@ -14,18 +13,10 @@ impl Label {
             address,
         }
     }
-
-    pub fn compare_name(&self, name: &str) -> bool {
-        self.name == name.to_string()
-    }
-
-    pub fn get_address(&self) -> i32 {
-        self.address
-    }
 }
 
-pub fn find_label<'a>(name: &'a str, labels: &'a Vec<Label>) -> Option<&'a Label> {
-    labels.iter().find(|label| label.compare_name(name))
+pub fn find_label<'a>(name: &'a str, labels: &'a [Label]) -> Option<&'a Label> {
+    labels.iter().find(|label| label.name == name)
 }
 
 pub fn is_label(code: &str) -> bool {
@@ -43,8 +34,8 @@ pub fn resolve_labels(code: &str) -> Option<Label> {
     }
 }
 
-pub fn get_addressed_labels(codes: &Vec<String>, labels: &Vec<Label>) -> Vec<Label> {
-    let mut current_address = 0x400000;
+pub fn get_addressed_labels(codes: &[String], labels: &[Label]) -> Vec<Label> {
+    let mut current_address = TEXT_SECTION_MIN_ADDRESS;
     codes
         .iter()
         .filter_map(|code| {
