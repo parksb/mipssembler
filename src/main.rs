@@ -124,7 +124,7 @@ fn write_output(filepath: &str, data: &[Datum], texts: &[Text]) {
     result.extend(data.iter().map(|datum| datum.to_binary()));
 
     let mut file = File::create(filepath).expect("Failed to crate output file.");
-    write!(file, "{}", result.join("\n")).expect("Failed to write output file.");
+    write!(file, "{}", result.join("")).expect("Failed to write output file.");
 }
 
 fn resolve_section(code: &str) -> Result<Section, Section> {

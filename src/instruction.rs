@@ -1,3 +1,5 @@
+use crate::text::Text;
+
 pub enum InstructionFormat {
     REGISTER,
     IMMEDIATE,
@@ -18,6 +20,26 @@ impl Instruction {
             opcode,
             funct,
         }
+    }
+
+    pub fn is_branch(&self) -> bool {
+        self.opcode == 4 || self.opcode == 5
+    }
+
+    pub fn is_shift(&self) -> bool {
+        self.funct == 0 || self.funct == 2
+    }
+
+    pub fn to_register_format_text(&self, rs: i32, rt: i32, rd: i32, shamt: i32) -> Text {
+        Text::new(rs, rt, rd, shamt, self.funct, self.opcode, 0, 0)
+    }
+
+    pub fn to_jump_format_text(&self, address: i32) -> Text {
+        Text::new(0, 0, 0, 0, self.funct, self.opcode, 0, address)
+    }
+
+    pub fn to_immediate_format_text(&self, rs: i32, rt: i32, immediate: i32) -> Text {
+        Text::new(rs, rt, 0, 0, self.funct, self.opcode, immediate, 0)
     }
 }
 

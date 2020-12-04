@@ -2,7 +2,7 @@ use crate::constants::INSTRUCTION_TABLE;
 use crate::datum::{find_datum, Datum};
 use crate::instruction::{convert_opcode_to_format, Instruction, InstructionFormat};
 use crate::label::{find_label, Label};
-use crate::utils::{convert_int_to_binary, convert_string_to_int, get_address_height};
+use crate::utils::{convert_int_to_binary, convert_string_to_int, get_address_difference};
 use regex::Regex;
 
 #[derive(Clone)]
@@ -25,7 +25,7 @@ pub struct Text {
 }
 
 impl Text {
-    fn new(
+    pub fn new(
         rs: i32,
         rt: i32,
         rd: i32,
@@ -101,57 +101,23 @@ pub fn get_text_from_code(
 }
 
 fn get_text_by_format(instruction: &Instruction, arguments: &[i32], current_address: i32) -> Text {
-    let Instruction { funct, opcode, .. } = instruction;
     match convert_opcode_to_format(instruction.opcode) {
-        InstructionFormat::REGISTER => match instruction.funct {
-            0 | 2 => Text::new(
-                0,
-                arguments[1],
-                arguments[0],
-                arguments[2],
-                *funct,
-                *opcode,
-                0,
-                0,
-            ),
-            _ => Text::new(
-                arguments[1],
-                arguments[2],
-                arguments[0],
-                0,
-                *funct,
-                *opcode,
-                0,
-                0,
-            ),
-        },
-        InstructionFormat::JUMP => Text::new(0, 0, 0, 0, *funct, *opcode, 0, arguments[0] >> 2),
+        InstructionFormat::REGISTER => {
+            if instruction.is_shift() {
+                instruction.to_register_format_text(0, arguments[1], arguments[0], arguments[2])
+            } else {
+                instruction.to_register_format_text(arguments[1], arguments[2], arguments[0], 0)
+            }
+        }
+        InstructionFormat::JUMP => instruction.to_jump_format_text(arguments[0] >> 2),
         InstructionFormat::IMMEDIATE => {
             if arguments.len() < 3 {
-                Text::new(0, arguments[0], 0, 0, *funct, *opcode, arguments[1], 0)
+                instruction.to_immediate_format_text(0, arguments[0], arguments[1])
+            } else if instruction.is_branch() {
+                let difference = get_address_difference(current_address, arguments[2]);
+                instruction.to_immediate_format_text(arguments[0], arguments[1], difference)
             } else {
-                match instruction.opcode {
-                    4 | 5 => Text::new(
-                        arguments[0],
-                        arguments[1],
-                        0,
-                        0,
-                        *funct,
-                        *opcode,
-                        get_address_height(current_address, arguments[2]),
-                        0,
-                    ),
-                    _ => Text::new(
-                        arguments[0],
-                        arguments[1],
-                        0,
-                        0,
-                        *funct,
-                        *opcode,
-                        arguments[2],
-                        0,
-                    ),
-                }
+                instruction.to_immediate_format_text(arguments[0], arguments[1], arguments[2])
             }
         }
         InstructionFormat::PSEUDO => panic!("A pseudo instruction found."),

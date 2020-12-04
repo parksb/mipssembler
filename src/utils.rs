@@ -25,7 +25,7 @@ pub fn convert_string_to_int(code: &str) -> i32 {
     }
 }
 
-pub fn get_address_height(current_address: i32, target_address: i32) -> i32 {
+pub fn get_address_difference(current_address: i32, target_address: i32) -> i32 {
     (target_address - current_address) / WORD - 1
 }
 
