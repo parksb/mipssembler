@@ -7,91 +7,144 @@ mod models;
 mod utils;
 
 use crate::constants::{INSTRUCTION_TABLE, WORD};
-use crate::models::{
-    ArgumentType, Datum, Instruction, InstructionFormat, Label, Section, Text,
-};
+use crate::models::{ArgumentType, Datum, Instruction, InstructionFormat, Label, Section, Text};
 use crate::utils::{convert_string_to_int, read_lines};
 
 fn main() {
-    let mut data: Vec<Datum> = vec![];
-    let mut labels: Vec<Label> = vec![];
-    let mut texts: Vec<Text> = vec![];
-
     let args: Vec<String> = env::args().collect();
     let input_filepath = &args[1];
     let mut input_file = File::open(input_filepath).expect("Failed to read input file.");
 
-    set_initial_values(&mut data, &mut labels, &mut input_file);
-    disassemble_instructions(&mut data, &mut labels, &mut texts, &mut input_file);
+    let (data, labels) = set_initial_values(&mut input_file);
+    let codes = extract_text_from_file(&data, &mut input_file);
+    let texts = disassemble_instructions(&data, &labels, &codes);
 
+    println!("CODE: {:?}", codes);
     println!("DATA: {:?}", data);
     println!("LABELS: {:?}", labels);
     println!("TEXTS: {:?}", texts);
 }
 
-fn set_initial_values(
-    mut data: &mut Vec<Datum>,
-    mut labels: &mut Vec<Label>,
-    mut input_file: &mut File,
-) {
+fn extract_text_from_file(data: &Vec<Datum>, mut input_file: &mut File) -> Vec<String> {
+    let mut codes = vec![];
+    let mut current_section = Section::NONE;
+    let mut text_section_size = 0;
+
+    for line in read_lines(&mut input_file, 0) {
+        current_section = resolve_section(&line).unwrap_or(current_section);
+
+        match current_section {
+            Section::TEXT => {
+                text_section_size += 1;
+                if text_section_size > 1 && !line.is_empty() {
+                    if !is_label(&line) {
+                        if let Some(pseudo_instructions) =
+                            disassemble_pseudo_instruction(&line, &data)
+                        {
+                            codes.extend(pseudo_instructions);
+                        } else {
+                            codes.push(line.trim_start().to_string());
+                        }
+                    } else {
+                        codes.push(line);
+                    }
+                }
+            }
+            _ => (),
+        }
+    }
+
+    codes
+}
+
+fn disassemble_pseudo_instruction(text: &str, data: &Vec<Datum>) -> Option<Vec<String>> {
+    if let [name, arguments] = text.trim_start().split('\t').collect::<Vec<&str>>()[..] {
+        match name {
+            "la" => Some(la(arguments, &data)),
+            _ => None,
+        }
+    } else {
+        panic!("Invalid instruction")
+    }
+}
+
+fn la(arguments: &str, data: &Vec<Datum>) -> Vec<String> {
+    let mut result: Vec<String> = vec![];
+    let argument_text = arguments
+        .split(",")
+        .map(|arg| arg.trim())
+        .collect::<Vec<&str>>();
+
+    if let [register, datum_name] = argument_text[..] {
+        if let Some(datum) = find_datum(datum_name, &data) {
+            let shifted_datum_address = datum.get_address() >> 16;
+            result.push(format!("lui\t{}, {}", register, shifted_datum_address));
+
+            if (datum.get_address() << 16) > 0 {
+                let ad = datum.get_address() - 0x10000000;
+                result.push(format!("ori\t{}, {}, {}", register, register, ad));
+            }
+        } else {
+            panic!("Unknown data.");
+        }
+    } else {
+        panic!("Failed.");
+    }
+
+    result
+}
+
+fn set_initial_values(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>) {
     let mut current_address = 0x10000000 - WORD;
     let mut current_section = Section::NONE;
 
-    let mut data_section_size = 0;
-    let mut text_section_size = 0;
+    let mut data: Vec<Datum> = vec![];
+    let mut labels: Vec<Label> = vec![];
 
     for line in read_lines(&mut input_file, 0) {
         current_section = resolve_section(&line).unwrap_or(current_section);
 
         match current_section {
             Section::DATA => {
-                data_section_size += 1;
-                resolve_data(&line, current_address, &mut data);
+                if let Some(datum) = resolve_data(&line, current_address) {
+                    data.push(datum);
+                }
                 current_address += WORD;
             }
             Section::TEXT => {
-                text_section_size += 1;
-                if !resolve_labels(&line, current_address, &mut labels) {
-                    current_address += WORD;
+                if let Some(label) = resolve_labels(&line) {
+                    labels.push(label);
                 }
             }
             Section::NONE => (),
         }
     }
+
+    (data, labels)
 }
 
 fn disassemble_instructions(
-    data: &mut Vec<Datum>,
-    mut labels: &mut Vec<Label>,
-    mut texts: &mut Vec<Text>,
-    mut input_file: &mut File,
-) {
+    data: &Vec<Datum>,
+    labels: &Vec<Label>,
+    codes: &Vec<String>,
+) -> Vec<Text> {
     let mut current_address = 0x10000000 - WORD;
-    let mut current_section = Section::NONE;
-    let mut text_section_size = 0;
-
-    for line in read_lines(&mut input_file, 0) {
-        current_section = resolve_section(&line).unwrap_or(current_section);
-
-        match current_section {
-            Section::TEXT => {
-                text_section_size += 1;
-                if !resolve_labels(&line, current_address, &mut labels) {
-                    if text_section_size > 1 {
-                        append_instructions_to_text(
-                            &line,
-                            current_address,
-                            &data,
-                            &labels,
-                            &mut texts,
-                        );
-                    }
-                    current_address += WORD;
-                }
+    codes
+        .iter()
+        .filter_map(|line| {
+            if let None = resolve_labels(&line) {
+                current_address += WORD;
+                Some(append_instructions_to_text(
+                    &line,
+                    current_address,
+                    &data,
+                    &labels,
+                ))
+            } else {
+                None
             }
-            _ => (),
-        }
-    }
+        })
+        .collect()
 }
 
 fn append_instructions_to_text(
@@ -99,8 +152,7 @@ fn append_instructions_to_text(
     current_address: i32,
     data: &Vec<Datum>,
     labels: &Vec<Label>,
-    texts: &mut Vec<Text>,
-) {
+) -> Text {
     if let [name, arguments] = text.trim_start().split('\t').collect::<Vec<&str>>()[..] {
         let instruction = INSTRUCTION_TABLE
             .iter()
@@ -114,9 +166,9 @@ fn append_instructions_to_text(
 
         let arguments = resolve_arguments(&argument_texts, &data, &labels);
 
-        for text in get_text_by_format(&instruction, &arguments, current_address) {
-            texts.push(text);
-        }
+        get_text_by_format(&instruction, &arguments, current_address)
+    } else {
+        panic!("No");
     }
 }
 
@@ -124,10 +176,10 @@ fn get_text_by_format(
     instruction: &Instruction,
     arguments: &Vec<i32>,
     current_address: i32,
-) -> Vec<Text> {
+) -> Text {
     let Instruction { funct, opcode, .. } = instruction;
     match convert_opcode_to_format(instruction.opcode) {
-        InstructionFormat::REGISTER => vec![Text::new(
+        InstructionFormat::REGISTER => Text::new(
             arguments[1],
             arguments[2],
             arguments[0],
@@ -136,8 +188,8 @@ fn get_text_by_format(
             *opcode,
             0,
             0,
-        )],
-        InstructionFormat::JUMP => vec![Text::new(
+        ),
+        InstructionFormat::JUMP => Text::new(
             0,
             0,
             0,
@@ -146,18 +198,24 @@ fn get_text_by_format(
             *opcode,
             0,
             get_address_difference(current_address, arguments[0]),
-        )],
-        InstructionFormat::IMMEDIATE => vec![Text::new(
-            arguments[0],
-            arguments[1],
-            0,
-            0,
-            *funct,
-            *opcode,
-            arguments[2],
-            0,
-        )],
-        InstructionFormat::PSEUDO => panic!("A pseudo instruction found.")
+        ),
+        InstructionFormat::IMMEDIATE => {
+            if arguments.len() < 3 {
+                Text::new(0, arguments[0], 0, 0, *funct, *opcode, arguments[1], 0)
+            } else {
+                Text::new(
+                    arguments[0],
+                    arguments[1],
+                    0,
+                    0,
+                    *funct,
+                    *opcode,
+                    arguments[2],
+                    0,
+                )
+            }
+        }
+        InstructionFormat::PSEUDO => panic!("A pseudo instruction found."),
     }
 }
 
@@ -226,30 +284,32 @@ fn resolve_section(text: &str) -> Result<Section, Section> {
     }
 }
 
-fn resolve_data(text: &str, current_address: i32, data: &mut Vec<Datum>) -> bool {
-    let is_data = true;
+fn resolve_data(text: &str, current_address: i32) -> Option<Datum> {
     if let [name, meta] = text.split(":\t").collect::<Vec<&str>>()[..] {
         if let [_, value] = meta.split('\t').collect::<Vec<&str>>()[..] {
             let parsed_value = convert_string_to_int(value);
-            data.push(Datum::new(name, parsed_value, current_address));
-            return is_data;
+            Some(Datum::new(name, parsed_value, current_address))
+        } else {
+            None
         }
+    } else {
+        None
     }
-
-    !is_data
 }
 
-fn resolve_labels(text: &str, current_address: i32, labels: &mut Vec<Label>) -> bool {
-    let is_label = true;
+fn resolve_labels(text: &str) -> Option<Label> {
     let label_regex = Regex::new(r"^.*:").unwrap();
-
     if let Some(cap) = label_regex.captures_iter(&text).next() {
         let name = cap[0].trim_end_matches(':');
-        labels.push(Label::new(name, current_address, 0));
-        is_label
+        Some(Label::new(name, 0, 0))
     } else {
-        !is_label
+        None
     }
+}
+
+fn is_label(text: &str) -> bool {
+    let label_regex = Regex::new(r"^.*:").unwrap();
+    label_regex.is_match(text)
 }
 
 fn get_address_difference(current_address: i32, target_address: i32) -> i32 {
