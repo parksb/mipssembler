@@ -82,10 +82,7 @@ pub fn get_text_from_code(
     labels: &[Label],
 ) -> Text {
     if let [name, arguments] = text.trim_start().split('\t').collect::<Vec<&str>>()[..] {
-        let instruction = INSTRUCTION_TABLE
-            .iter()
-            .find(|table| table.name == name)
-            .unwrap();
+        let instruction = INSTRUCTION_TABLE.get(name).expect("Unknown instruction.");
 
         let argument_texts = arguments
             .split(',')

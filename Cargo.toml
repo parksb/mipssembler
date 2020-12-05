@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 regex = "^1.4"
+phf = { version = "0.8", features = ["macros"] }
