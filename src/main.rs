@@ -46,13 +46,18 @@ fn extract_data_and_labels(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>
     let mut data: Vec<Datum> = vec![];
     let mut labels: Vec<Label> = vec![];
 
+    let mut prev_datum_name: Option<String> = None;
+
     for line in read_lines(&mut input_file) {
         current_section = resolve_section(&line).unwrap_or(current_section);
 
         match current_section {
             Section::DATA => {
-                if let Some(datum) = resolve_data(&line, current_address) {
-                    data.push(datum);
+                if resolve_section(&line).is_none() {
+                    if let Some(datum) = resolve_data(&line, &prev_datum_name, current_address) {
+                        prev_datum_name = Some((&datum).name.clone());
+                        data.push(datum);
+                    }
                 }
                 current_address += WORD;
             }
@@ -71,14 +76,12 @@ fn extract_data_and_labels(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>
 fn extract_codes(data: &[Datum], mut input_file: &mut File) -> Vec<String> {
     let mut codes = vec![];
     let mut current_section = Section::NONE;
-    let mut text_section_size = 0;
 
     for line in read_lines(&mut input_file) {
         current_section = resolve_section(&line).unwrap_or(current_section);
 
         if let Section::TEXT = current_section {
-            text_section_size += 1;
-            if text_section_size > 1 && !line.is_empty() {
+            if !line.is_empty() && resolve_section(&line).is_none() {
                 if !is_label(&line) {
                     let pseudo_instruction_codes = disassemble_pseudo_instruction(&line, &data);
                     if let Some(pseudo_instruction_codes) = pseudo_instruction_codes {
@@ -127,10 +130,10 @@ fn write_output(filepath: &str, data: &[Datum], texts: &[Text]) {
     write!(file, "{}", result.join("")).expect("Failed to write output file.");
 }
 
-fn resolve_section(code: &str) -> Result<Section, Section> {
+fn resolve_section(code: &str) -> Option<Section> {
     match code {
-        "\t.data" => Ok(Section::DATA),
-        "\t.text" => Ok(Section::TEXT),
-        _ => Err(Section::NONE),
+        "\t.data" => Some(Section::DATA),
+        "\t.text" => Some(Section::TEXT),
+        _ => None,
     }
 }
