@@ -30,19 +30,6 @@ pub fn get_address_difference(current_address: i32, target_address: i32) -> i32 
 }
 
 pub fn convert_int_to_binary(number: i32, bit: i32) -> String {
-    match bit {
-        32 => format!("{:032b}", number),
-        26 => format!("{:026b}", number),
-        16 => {
-            if number < 0 {
-                let result = format!("{:016b}", number);
-                result[16..result.len()].to_string()
-            } else {
-                format!("{:016b}", number)
-            }
-        }
-        6 => format!("{:06b}", number),
-        5 => format!("{:05b}", number),
-        _ => format!("{:b}", number),
-    }
+    let binary = format!("{:032b}", number);
+    binary[(binary.len() - (bit as usize))..].to_string()
 }
