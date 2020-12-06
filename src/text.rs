@@ -141,11 +141,11 @@ fn resolve_arguments(argument_codes: &[&str], data: &[Datum], labels: &[Label]) 
             }
             ArgumentType::STACK => {
                 if let [offset, base] = argument_text.split('(').collect::<Vec<&str>>()[..] {
-                    let offset = convert_string_to_int(offset);
                     let base = convert_string_to_int(&base[1..(base.len() - 1)]);
+                    let offset = convert_string_to_int(offset);
 
-                    arguments.push(offset);
                     arguments.push(base);
+                    arguments.push(offset);
                 } else {
                     panic!("Failed to resolve argument value.");
                 }
