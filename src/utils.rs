@@ -16,10 +16,12 @@ pub fn read_lines(file: &mut File) -> LinesMap {
 }
 
 pub fn convert_string_to_int(code: &str) -> i32 {
-    if code.starts_with('-') {
-        i32::from_str_radix(&code[1..code.len()], 16).unwrap().neg()
-    } else if code.starts_with("0x") {
+    if code.starts_with("0x") {
         i32::from_str_radix(code.trim_start_matches("0x"), 16).unwrap()
+    } else if code.starts_with('-') {
+        i32::from_str_radix(code.trim_start_matches('-'), 10)
+            .unwrap()
+            .neg()
     } else {
         i32::from_str_radix(code, 10).unwrap()
     }
