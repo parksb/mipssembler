@@ -9,3 +9,7 @@ edition = "2018"
 [dependencies]
 regex = "^1.4"
 phf = { version = "0.8", features = ["macros"] }
+
+[dev-dependencies]
+assert_cmd = "1.0.2"
+tempfile = "3.1.0"
