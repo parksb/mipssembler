@@ -114,7 +114,7 @@ fn get_text_by_format(instruction: &Instruction, arguments: &[i32], current_addr
                 let difference = get_address_difference(current_address, arguments[2]);
                 instruction.to_immediate_format_text(arguments[0], arguments[1], difference)
             } else {
-                instruction.to_immediate_format_text(arguments[0], arguments[1], arguments[2])
+                instruction.to_immediate_format_text(arguments[1], arguments[0], arguments[2])
             }
         }
         InstructionFormat::PSEUDO => panic!("A pseudo instruction found."),

@@ -55,7 +55,7 @@ fn extract_data_and_labels(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>
             Section::DATA => {
                 if resolve_section(&line).is_none() {
                     if let Some(datum) = resolve_data(&line, &prev_datum_name, current_address) {
-                        prev_datum_name = Some((&datum).name.clone());
+                        prev_datum_name = Some(datum.name.clone());
                         data.push(datum);
                     }
                 }
