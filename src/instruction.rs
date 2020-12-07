@@ -30,6 +30,10 @@ impl Instruction {
         self.funct == 0 || self.funct == 2
     }
 
+    pub fn is_register_jump(&self) -> bool {
+       self.funct == 8
+    }
+
     pub fn to_register_format_text(&self, rs: i32, rt: i32, rd: i32, shamt: i32) -> Text {
         Text::new(rs, rt, rd, shamt, self.funct, self.opcode, 0, 0)
     }

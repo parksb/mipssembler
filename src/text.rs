@@ -98,23 +98,29 @@ pub fn get_text_from_code(
 }
 
 fn get_text_by_format(instruction: &Instruction, arguments: &[i32], current_address: i32) -> Text {
+    let first_arg = *arguments.get(0).unwrap_or(&0);
+    let second_arg = *arguments.get(1).unwrap_or(&0);
+    let third_arg = *arguments.get(2).unwrap_or(&0);
+
     match convert_opcode_to_format(instruction.opcode) {
         InstructionFormat::REGISTER => {
             if instruction.is_shift() {
-                instruction.to_register_format_text(0, arguments[1], arguments[0], arguments[2])
+                instruction.to_register_format_text(0, second_arg, first_arg, third_arg)
+            } else if instruction.is_register_jump() {
+                instruction.to_register_format_text(first_arg, 0, 0, 0)
             } else {
-                instruction.to_register_format_text(arguments[1], arguments[2], arguments[0], 0)
+                instruction.to_register_format_text(second_arg, third_arg, first_arg, 0)
             }
         }
-        InstructionFormat::JUMP => instruction.to_jump_format_text(arguments[0] >> 2),
+        InstructionFormat::JUMP => instruction.to_jump_format_text(first_arg >> 2),
         InstructionFormat::IMMEDIATE => {
             if arguments.len() < 3 {
-                instruction.to_immediate_format_text(0, arguments[0], arguments[1])
+                instruction.to_immediate_format_text(0, first_arg, second_arg)
             } else if instruction.is_branch() {
-                let difference = get_address_difference(current_address, arguments[2]);
-                instruction.to_immediate_format_text(arguments[0], arguments[1], difference)
+                let difference = get_address_difference(current_address, third_arg);
+                instruction.to_immediate_format_text(first_arg, second_arg, difference)
             } else {
-                instruction.to_immediate_format_text(arguments[1], arguments[0], arguments[2])
+                instruction.to_immediate_format_text(second_arg, first_arg, third_arg)
             }
         }
         InstructionFormat::PSEUDO => panic!("A pseudo instruction found."),

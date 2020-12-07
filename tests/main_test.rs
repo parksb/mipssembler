@@ -69,3 +69,24 @@ fn test_main_case_3() {
 
     assert_eq!(actual, OUTPUT_CASE_3);
 }
+
+#[test]
+fn test_main_case_4() {
+    use fixtures::{INPUT_CASE_4, OUTPUT_CASE_4};
+
+    let mut input_file = NamedTempFile::new().unwrap();
+    input_file.write_all(INPUT_CASE_4.as_bytes()).unwrap();
+
+    let mut output_file = NamedTempFile::new().unwrap();
+
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .args(&[input_file.path(), output_file.path()])
+        .assert()
+        .success();
+
+    let mut actual = String::new();
+    output_file.read_to_string(&mut actual).unwrap();
+
+    assert_eq!(actual, OUTPUT_CASE_4);
+}
