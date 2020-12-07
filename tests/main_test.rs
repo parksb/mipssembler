@@ -90,3 +90,24 @@ fn test_main_case_4() {
 
     assert_eq!(actual, OUTPUT_CASE_4);
 }
+
+#[test]
+fn test_main_case_5() {
+    use fixtures::{INPUT_CASE_5, OUTPUT_CASE_5};
+
+    let mut input_file = NamedTempFile::new().unwrap();
+    input_file.write_all(INPUT_CASE_5.as_bytes()).unwrap();
+
+    let mut output_file = NamedTempFile::new().unwrap();
+
+    Command::cargo_bin(BIN_NAME)
+        .unwrap()
+        .args(&[input_file.path(), output_file.path()])
+        .assert()
+        .success();
+
+    let mut actual = String::new();
+    output_file.read_to_string(&mut actual).unwrap();
+
+    assert_eq!(actual, OUTPUT_CASE_5);
+}
