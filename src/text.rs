@@ -1,9 +1,10 @@
+use regex::Regex;
+
 use crate::constants::INSTRUCTION_TABLE;
 use crate::datum::{find_datum, Datum};
 use crate::instruction::{convert_opcode_to_format, Instruction, InstructionFormat};
 use crate::label::{find_label, Label};
 use crate::utils::{convert_int_to_binary, convert_string_to_int, get_address_difference};
-use regex::Regex;
 
 #[derive(Clone)]
 enum ArgumentType {
@@ -128,19 +129,18 @@ fn get_text_by_format(instruction: &Instruction, arguments: &[i32], current_addr
 }
 
 fn resolve_arguments(argument_codes: &[&str], data: &[Datum], labels: &[Label]) -> Vec<i32> {
-    let mut arguments: Vec<i32> = vec![];
-
-    for argument_text in argument_codes {
-        match resolve_argument_type(argument_text) {
-            ArgumentType::NUMBER => arguments.push(convert_string_to_int(argument_text)),
-            ArgumentType::REGISTER => arguments.push(convert_string_to_int(
+    argument_codes
+        .iter()
+        .flat_map(|argument_text| match resolve_argument_type(argument_text) {
+            ArgumentType::NUMBER => vec![convert_string_to_int(argument_text)],
+            ArgumentType::REGISTER => vec![convert_string_to_int(
                 &argument_text[1..argument_text.len()],
-            )),
+            )],
             ArgumentType::LABEL => {
                 if let Some(datum) = find_datum(argument_text, &data) {
-                    arguments.push(datum.address);
+                    vec![datum.address]
                 } else if let Some(label) = find_label(argument_text, &labels) {
-                    arguments.push(label.address);
+                    vec![label.address]
                 } else {
                     panic!("Failed to resolve argument value.");
                 }
@@ -150,16 +150,13 @@ fn resolve_arguments(argument_codes: &[&str], data: &[Datum], labels: &[Label]) 
                     let base = convert_string_to_int(&base[1..(base.len() - 1)]);
                     let offset = convert_string_to_int(offset);
 
-                    arguments.push(base);
-                    arguments.push(offset);
+                    vec![base, offset]
                 } else {
                     panic!("Failed to resolve argument value.");
                 }
             }
-        }
-    }
-
-    arguments
+        })
+        .collect()
 }
 
 fn resolve_argument_type(text: &str) -> ArgumentType {
