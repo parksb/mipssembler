@@ -1,5 +1,6 @@
+use crate::line::Line;
+use crate::section::Section;
 use crate::utils::{convert_int_to_binary, convert_string_to_int};
-use crate::{Line, Section};
 
 pub struct Datum {
     pub name: String,
@@ -26,9 +27,11 @@ pub fn extract_data_from_lines(lines: &[Line]) -> Vec<Datum> {
 
     lines
         .iter()
-        .filter(|line| line.0 == Section::DATA)
+        .filter(|line| line.section == Section::DATA)
         .map(|line| {
-            if let Some(datum) = resolve_data(&line.2.as_ref().unwrap(), &prev_datum_name, line.1) {
+            if let Some(datum) =
+                resolve_data(&line.text.as_ref().unwrap(), &prev_datum_name, line.address)
+            {
                 prev_datum_name = Some(datum.name.clone());
                 Some(datum)
             } else {

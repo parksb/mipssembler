@@ -1,6 +1,8 @@
-use crate::constants::{TEXT_SECTION_MIN_ADDRESS, WORD};
-use crate::{Line, Section};
 use regex::Regex;
+
+use crate::constants::{TEXT_SECTION_MIN_ADDRESS, WORD};
+use crate::line::Line;
+use crate::section::Section;
 
 pub struct Label {
     name: String,
@@ -19,9 +21,9 @@ impl Label {
 pub fn extract_labels_from_lines(lines: &[Line]) -> Vec<Label> {
     lines
         .iter()
-        .filter(|line| line.0 == Section::TEXT)
+        .filter(|line| line.section == Section::TEXT)
         .map(|line| {
-            if let Some(label) = resolve_labels(&line.2.as_ref().unwrap()) {
+            if let Some(label) = resolve_labels(&line.text.as_ref().unwrap()) {
                 Some(label)
             } else {
                 None
