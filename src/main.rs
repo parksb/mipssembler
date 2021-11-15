@@ -10,13 +10,18 @@ mod text;
 mod utils;
 
 use crate::constants::{DATA_SECTION_MIN_ADDRESS, TEXT_SECTION_MIN_ADDRESS, WORD};
-use crate::datum::{resolve_data, Datum};
-use crate::label::{get_addressed_labels, is_label, resolve_labels, Label};
+use crate::datum::{extract_data_from_lines, Datum};
+use crate::label::{
+    extract_labels_from_lines, get_addressed_labels, is_label, resolve_labels, Label,
+};
 use crate::pseudo_instruction::disassemble_pseudo_instruction;
 use crate::text::{get_text_from_code, Text};
 use crate::utils::{convert_int_to_binary, read_lines};
 use std::io::Write;
 
+type Line = (Section, i32, Option<String>);
+
+#[derive(Clone, PartialEq)]
 pub enum Section {
     NONE,
     DATA,
@@ -29,7 +34,10 @@ fn main() {
     let output_filepath = &args[2];
     let mut input_file = File::open(input_filepath).expect("Failed to read input file.");
 
-    let (data, labels) = extract_data_and_labels(&mut input_file);
+    let lines = compose_lines(&mut input_file);
+    let data = extract_data_from_lines(&lines);
+    let labels = extract_labels_from_lines(&lines);
+
     let codes = extract_codes(&data, &mut input_file);
     let labels = get_addressed_labels(&codes, &labels);
     let texts = disassemble_instructions(&data, &labels, &codes);
@@ -39,38 +47,30 @@ fn main() {
     println!("Done!");
 }
 
-fn extract_data_and_labels(mut input_file: &mut File) -> (Vec<Datum>, Vec<Label>) {
+fn compose_lines(mut input_file: &mut File) -> Vec<Line> {
+    let lines = read_lines(&mut input_file);
+
     let mut current_address = DATA_SECTION_MIN_ADDRESS - WORD;
     let mut current_section = Section::NONE;
 
-    let mut data: Vec<Datum> = vec![];
-    let mut labels: Vec<Label> = vec![];
-
-    let mut prev_datum_name: Option<String> = None;
-
-    for line in read_lines(&mut input_file) {
-        current_section = resolve_section(&line).unwrap_or(current_section);
-
-        match current_section {
-            Section::DATA => {
-                if resolve_section(&line).is_none() {
-                    if let Some(datum) = resolve_data(&line, &prev_datum_name, current_address) {
-                        prev_datum_name = Some(datum.name.clone());
-                        data.push(datum);
-                    }
+    lines
+        .map(|line| {
+            current_section = resolve_section(&line).unwrap_or_else(|| current_section.clone());
+            match current_section {
+                Section::DATA => {
+                    let result = if resolve_section(&line).is_none() {
+                        (Section::DATA, current_address, Some(line))
+                    } else {
+                        (Section::NONE, current_address, None)
+                    };
+                    current_address += WORD;
+                    result
                 }
-                current_address += WORD;
+                Section::TEXT => (Section::TEXT, current_address, Some(line)),
+                Section::NONE => (Section::NONE, current_address, None),
             }
-            Section::TEXT => {
-                if let Some(label) = resolve_labels(&line) {
-                    labels.push(label);
-                }
-            }
-            Section::NONE => (),
-        }
-    }
-
-    (data, labels)
+        })
+        .collect::<Vec<Line>>()
 }
 
 fn extract_codes(data: &[Datum], mut input_file: &mut File) -> Vec<String> {
@@ -78,7 +78,7 @@ fn extract_codes(data: &[Datum], mut input_file: &mut File) -> Vec<String> {
     let mut current_section = Section::NONE;
 
     for line in read_lines(&mut input_file) {
-        current_section = resolve_section(&line).unwrap_or(current_section);
+        current_section = resolve_section(&line).unwrap_or_else(|| current_section.clone());
 
         if let Section::TEXT = current_section {
             if !line.is_empty() && resolve_section(&line).is_none() {

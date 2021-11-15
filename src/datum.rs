@@ -1,4 +1,5 @@
 use crate::utils::{convert_int_to_binary, convert_string_to_int};
+use crate::{Line, Section};
 
 pub struct Datum {
     pub name: String,
@@ -20,11 +21,29 @@ impl Datum {
     }
 }
 
+pub fn extract_data_from_lines(lines: &[Line]) -> Vec<Datum> {
+    let mut prev_datum_name: Option<String> = None;
+
+    lines
+        .iter()
+        .filter(|line| line.0 == Section::DATA)
+        .map(|line| {
+            if let Some(datum) = resolve_data(&line.2.as_ref().unwrap(), &prev_datum_name, line.1) {
+                prev_datum_name = Some(datum.name.clone());
+                Some(datum)
+            } else {
+                None
+            }
+        })
+        .filter_map(|line| line)
+        .collect()
+}
+
 pub fn find_datum<'a>(name: &'a str, data: &'a [Datum]) -> Option<&'a Datum> {
     data.iter().find(|datum| datum.name == name)
 }
 
-pub fn resolve_data(code: &str, prev_datum_name: &Option<String>, address: i32) -> Option<Datum> {
+fn resolve_data(code: &str, prev_datum_name: &Option<String>, address: i32) -> Option<Datum> {
     if let [name, _, value] = code.split('\t').collect::<Vec<&str>>()[..] {
         let value = convert_string_to_int(value);
         let name = name.trim_end_matches(':');

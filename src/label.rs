@@ -1,4 +1,5 @@
 use crate::constants::{TEXT_SECTION_MIN_ADDRESS, WORD};
+use crate::{Line, Section};
 use regex::Regex;
 
 pub struct Label {
@@ -13,6 +14,21 @@ impl Label {
             address,
         }
     }
+}
+
+pub fn extract_labels_from_lines(lines: &[Line]) -> Vec<Label> {
+    lines
+        .iter()
+        .filter(|line| line.0 == Section::TEXT)
+        .map(|line| {
+            if let Some(label) = resolve_labels(&line.2.as_ref().unwrap()) {
+                Some(label)
+            } else {
+                None
+            }
+        })
+        .filter_map(|label| label)
+        .collect()
 }
 
 pub fn find_label<'a>(name: &'a str, labels: &'a [Label]) -> Option<&'a Label> {

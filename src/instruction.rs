@@ -31,7 +31,7 @@ impl Instruction {
     }
 
     pub fn is_register_jump(&self) -> bool {
-       self.funct == 8
+        self.funct == 8
     }
 
     pub fn to_register_format_text(&self, rs: i32, rt: i32, rd: i32, shamt: i32) -> Text {
