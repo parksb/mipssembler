@@ -18,21 +18,6 @@ impl Label {
     }
 }
 
-pub fn extract_labels_from_lines(lines: &[Line]) -> Vec<Label> {
-    lines
-        .iter()
-        .filter(|line| line.section == Section::TEXT)
-        .map(|line| {
-            if let Some(label) = resolve_labels(&line.text.as_ref().unwrap()) {
-                Some(label)
-            } else {
-                None
-            }
-        })
-        .filter_map(|label| label)
-        .collect()
-}
-
 pub fn find_label<'a>(name: &'a str, labels: &'a [Label]) -> Option<&'a Label> {
     labels.iter().find(|label| label.name == name)
 }
@@ -52,8 +37,10 @@ pub fn resolve_labels(code: &str) -> Option<Label> {
     }
 }
 
-pub fn get_addressed_labels(codes: &[String], labels: &[Label]) -> Vec<Label> {
+pub fn get_addressed_labels(lines: &[Line], codes: &[String]) -> Vec<Label> {
     let mut current_address = TEXT_SECTION_MIN_ADDRESS;
+    let labels = extract_labels_from_lines(lines);
+
     codes
         .iter()
         .filter_map(|code| {
@@ -68,5 +55,20 @@ pub fn get_addressed_labels(codes: &[String], labels: &[Label]) -> Vec<Label> {
                 None
             }
         })
+        .collect()
+}
+
+fn extract_labels_from_lines(lines: &[Line]) -> Vec<Label> {
+    lines
+        .iter()
+        .filter(|line| line.section == Section::TEXT)
+        .map(|line| {
+            if let Some(label) = resolve_labels(&line.text.as_ref().unwrap()) {
+                Some(label)
+            } else {
+                None
+            }
+        })
+        .filter_map(|label| label)
         .collect()
 }

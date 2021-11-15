@@ -14,9 +14,7 @@ mod utils;
 
 use crate::constants::{TEXT_SECTION_MIN_ADDRESS, WORD};
 use crate::datum::{extract_data_from_lines, Datum};
-use crate::label::{
-    extract_labels_from_lines, get_addressed_labels, is_label, resolve_labels, Label,
-};
+use crate::label::{get_addressed_labels, is_label, resolve_labels, Label};
 use crate::line::{compose_lines, Line};
 use crate::pseudo_instruction::disassemble_pseudo_instruction;
 use crate::section::{resolve_section, Section};
@@ -33,9 +31,7 @@ fn main() {
 
     let data = extract_data_from_lines(&lines);
     let codes = extract_codes(&lines, &data);
-
-    let labels = extract_labels_from_lines(&lines);
-    let labels = get_addressed_labels(&codes, &labels);
+    let labels = get_addressed_labels(&lines, &codes);
     let texts = disassemble_instructions(&data, &labels, &codes);
 
     write_output(output_filepath, &data, &texts);
